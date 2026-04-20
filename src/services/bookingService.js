@@ -33,3 +33,8 @@ export const updateBookingStops = async (id, completedStops) => {
   const bookingRef = doc(db, "bookings", id);
   await updateDoc(bookingRef, { completedStops });
 };
+
+export const updateBookingDeliveryReached = async (id, deliveryReached) => {
+  const bookingRef = doc(db, "bookings", id);
+  await updateDoc(bookingRef, { deliveryReached });
+};

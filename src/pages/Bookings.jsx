@@ -1,5 +1,5 @@
 import { useState, useEffect, useContext } from "react";
-import { getUserBookings, updateBookingStatus, createBooking, updateBookingStops, getBookings } from "../services/bookingService";
+import { getUserBookings, updateBookingStatus, createBooking, updateBookingStops, updateBookingDeliveryReached, getBookings } from "../services/bookingService";
 import { getRoutes, deleteRoute } from "../services/routeService";
 import { getUserShipments, deleteShipment } from "../services/shipmentService";
 import { matchData } from "../utils/matching";
@@ -268,24 +268,21 @@ const Bookings = () => {
         return { ...booking, completedStops: update.newCompleted };
       });
 
-      const completedBookings = updatedList.filter(
+      const reachedDestinationBookings = updatedList.filter(
         (booking) => groupIds.has(booking.id) &&
           booking.status === "accepted" &&
           isDestinationReached(booking)
       );
 
-      if (completedBookings.length > 0) {
-        await Promise.all(completedBookings.map((booking) =>
-          updateBookingStatus(booking.id, "completed")
-        ));
-        await Promise.all(completedBookings.map((booking) =>
-          deleteShipment(booking.shipmentId)
+      if (reachedDestinationBookings.length > 0) {
+        await Promise.all(reachedDestinationBookings.map((booking) =>
+          updateBookingDeliveryReached(booking.id, true)
         ));
       }
 
-      const completedIds = new Set(completedBookings.map((booking) => booking.id));
+      const completedIds = new Set(reachedDestinationBookings.map((booking) => booking.id));
       setBookings(updatedList.map((booking) => (
-        completedIds.has(booking.id) ? { ...booking, status: "completed" } : booking
+        completedIds.has(booking.id) ? { ...booking, deliveryReached: true } : booking
       )));
     } catch (error) {
       console.error("Failed to complete grouped stop", error);
@@ -313,6 +310,7 @@ const Bookings = () => {
         shipDetails: `${match.ship.from} ➔ ${match.ship.to}`,
         routeStops: match.route.stops || [],
         completedStops: [],
+        deliveryReached: false,
         routeSpace: match.route.space || "",
         shipSpace: match.ship.space || "",
         routeCapacity: match.route.capacity || 0,
@@ -517,7 +515,12 @@ const Bookings = () => {
               {user?.role === "business" && bookings.map(booking => (
                 <div key={booking.id} className="card booking-card" style={{ opacity: booking.status === "completed" ? 0.6 : 1 }}>
                   <div className="card-header" style={{ borderBottom: "1px solid rgba(255,255,255,0.1)", paddingBottom: "10px" }}>
-                    <h4>Status: <span style={{ color: booking.status === "completed" ? "#4caf50" : booking.status === "accepted" ? "#2196f3" : booking.status === "rejected" ? "#ff9800" : "var(--primary-color)" }}>{booking.status.toUpperCase()}</span></h4>
+                    <h4>
+                      Status:{" "}
+                      <span style={{ color: (booking.status === "completed" || booking.deliveryReached) ? "#4caf50" : booking.status === "accepted" ? "#2196f3" : booking.status === "rejected" ? "#ff9800" : "var(--primary-color)" }}>
+                        {(booking.status === "accepted" && booking.deliveryReached) ? "COMPLETED FOR YOU" : booking.status.toUpperCase()}
+                      </span>
+                    </h4>
                   </div>
                   <div className="card-body" style={{ marginTop: "10px" }}>
                     <p><strong>Route:</strong> {booking.routeDetails} {booking.routeSpace ? `(Space: ${booking.routeSpace}m³)` : ""}</p>
@@ -529,10 +532,10 @@ const Bookings = () => {
                     <p><strong>Driver:</strong> {booking.driverName} ({booking.driverContact})</p>
                     {(booking.status === "accepted" || booking.status === "completed") && (
                       <>
-                        <p><strong>Truck Current Location:</strong> {booking.status === "completed" ? getShipmentToNode(booking) : getCurrentTruckNode(booking)}</p>
+                        <p><strong>Truck Current Location:</strong> {(booking.status === "completed" || booking.deliveryReached) ? getShipmentToNode(booking) : getCurrentTruckNode(booking)}</p>
                         <p>
                           <strong>Trip Progress:</strong>{" "}
-                          {booking.status === "completed"
+                          {(booking.status === "completed" || booking.deliveryReached)
                             ? "Completed for your business"
                             : `Remaining (destination: ${getShipmentToNode(booking) || "N/A"})`}
                         </p>
