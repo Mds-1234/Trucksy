@@ -18,7 +18,7 @@ const BusinessDashboard = () => {
         const routes = await getRoutes();
         const shipments = await getUserShipments(user.uid);
         const bookings = await getBookings();
-        
+
         const result = matchData(routes, shipments, bookings);
         const unbookedMatches = result.filter(m => {
           return !bookings.some(
@@ -28,7 +28,7 @@ const BusinessDashboard = () => {
               (b.status === "pending" || b.status === "accepted")
           );
         });
-        
+
         setMatchCount(unbookedMatches.length);
       } catch (error) {
         console.error("Error fetching match data", error);

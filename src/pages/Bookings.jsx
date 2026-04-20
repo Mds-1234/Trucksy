@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext } from "react";
+import { useState, useEffect, useContext, useMemo } from "react";
 import { getUserBookings, updateBookingStatus, createBooking, updateBookingStops, updateBookingDeliveryReached, getBookings } from "../services/bookingService";
 import { getRoutes, deleteRoute } from "../services/routeService";
 import { getUserShipments, deleteShipment } from "../services/shipmentService";
@@ -166,10 +166,6 @@ const Bookings = () => {
     fetchData();
   }, [user]);
 
-  const canAcceptBooking = (pendingBooking) => {
-    return canAcceptBookingWithContext(pendingBooking, bookings, activeRouteIds);
-  };
-
   const handleUpdateStatus = async (id, newStatus) => {
     try {
       await updateBookingStatus(id, newStatus);
@@ -196,18 +192,6 @@ const Bookings = () => {
       console.error(`Failed to ${newStatus} trip`, error);
       alert("Failed to update status.");
     }
-  };
-
-  const getGroupedAcceptedBookings = () => {
-    const grouped = {};
-    bookings
-      .filter(b => b.status === "accepted" && activeRouteIds.has(b.routeId))
-      .forEach((booking) => {
-        const key = getRouteGroupKey(booking);
-        if (!grouped[key]) grouped[key] = [];
-        grouped[key].push(booking);
-      });
-    return Object.values(grouped);
   };
 
   const handleUpdateStatusForGroup = async (groupBookings, newStatus) => {
@@ -348,9 +332,30 @@ const Bookings = () => {
     }
   };
 
-  const pendingBookings = bookings.filter(b => b.status === "pending");
-  const actionablePendingBookings = pendingBookings.filter(canAcceptBooking);
-  const groupedAcceptedBookings = getGroupedAcceptedBookings();
+  const pendingBookings = useMemo(
+    () => bookings.filter((b) => b.status === "pending"),
+    [bookings]
+  );
+  const actionablePendingBookings = useMemo(
+    () => pendingBookings.filter((pendingBooking) =>
+      canAcceptBookingWithContext(pendingBooking, bookings, activeRouteIds)
+    ),
+    [pendingBookings, bookings, activeRouteIds]
+  );
+  const groupedAcceptedBookings = useMemo(
+    () => {
+      const grouped = {};
+      bookings
+        .filter((b) => b.status === "accepted" && activeRouteIds.has(b.routeId))
+        .forEach((booking) => {
+          const key = getRouteGroupKey(booking);
+          if (!grouped[key]) grouped[key] = [];
+          grouped[key].push(booking);
+        });
+      return Object.values(grouped);
+    },
+    [bookings, activeRouteIds]
+  );
 
   return (
     <div className="dashboard-container">
@@ -536,7 +541,7 @@ const Bookings = () => {
                         <p>
                           <strong>Trip Progress:</strong>{" "}
                           {(booking.status === "completed" || booking.deliveryReached)
-                            ? "Completed for your business"
+                            ? "Completed"
                             : `Remaining (destination: ${getShipmentToNode(booking) || "N/A"})`}
                         </p>
                       </>

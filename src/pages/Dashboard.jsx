@@ -1,7 +1,7 @@
 import { useContext } from "react";
 import { AuthContext } from "../context/AuthContext";
 import DriverDashboard from "./DriverDashBoard";
-import BusinessDashboard from "./BuisinessDashBoard";
+import BusinessDashboard from "./BusinessDashboard";
 
 const Dashboard = () => {
   const { user } = useContext(AuthContext);
